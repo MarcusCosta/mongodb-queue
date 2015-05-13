@@ -74,12 +74,14 @@ Queue.prototype.add = function(payload, opts, callback) {
         payload  : payload,
     }
     self.col.insert(msg, function(err, results) {
+        
         if (err) return callback(err)
-        callback(null, '' + results[0]._id)
+        callback(null, '' + results.ops[0]._id)
     })
 }
 
 Queue.prototype.get = function(opts, callback) {
+    
     var self = this
     if ( !callback ) {
         callback = opts
@@ -104,15 +106,15 @@ Queue.prototype.get = function(opts, callback) {
 
     self.col.findAndModify(query, sort, update, { new : true }, function(err, msg) {
         if (err) return callback(err)
-        if (!msg) return callback()
+        if (!msg.value) return callback()
 
         // convert to an external representation
-        msg = {
+        var msg = {
             // convert '_id' to an 'id' string
-            id      : '' + msg._id,
-            ack     : msg.ack,
-            payload : msg.payload,
-            tries   : msg.tries,
+            id      : '' + msg.value._id,
+            ack     : msg.value.ack,
+            payload : msg.value.payload,
+            tries   : msg.value.tries
         }
 
         // if we have a deadQueue, then check the tries, else don't
@@ -133,7 +135,7 @@ Queue.prototype.get = function(opts, callback) {
                 return
             }
         }
-
+        
         callback(null, msg)
     })
 }
@@ -158,7 +160,7 @@ Queue.prototype.ping = function(ack, opts, callback) {
     }
     self.col.findAndModify(query, undefined, update, { new : true }, function(err, msg, blah) {
         if (err) return callback(err)
-        if ( !msg ) {
+        if ( !msg.value ) {
             return callback(new Error("Queue.ping(): Unidentified ack  : " + ack))
         }
         callback(null, '' + msg._id)
@@ -167,7 +169,6 @@ Queue.prototype.ping = function(ack, opts, callback) {
 
 Queue.prototype.ack = function(ack, callback) {
     var self = this
-
     var query = {
         ack     : ack,
         visible : { $gt : now() },
@@ -179,10 +180,12 @@ Queue.prototype.ack = function(ack, callback) {
         }
     }
     self.col.findAndModify(query, undefined, update, { new : true }, function(err, msg, blah) {
+    
         if (err) return callback(err)
-        if ( !msg ) {
+        if ( !msg.value ) {
             return callback(new Error("Queue.ack(): Unidentified ack : " + ack))
         }
+
         callback(null, '' + msg._id)
     })
 }
